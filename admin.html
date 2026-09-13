@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>پنل مدیریت | Lost Frequency</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="assets/logo.jpg">
+</head>
+<body>
+
+<header>
+  <div class="logo"><img src="assets/logo.jpg" alt="Lost Frequency"> <span>مدیریت</span></div>
+  <nav><a href="/">بازگشت به سایت</a></nav>
+</header>
+
+<!-- فرم ورود -->
+<div class="admin-wrap" id="login-view">
+  <div class="card">
+    <div class="field">
+      <label>رمز ادمین</label>
+      <input type="password" id="password" placeholder="رمز عبور">
+    </div>
+    <button class="btn" onclick="login()" style="width:100%">ورود</button>
+    <div class="msg err" id="login-msg"></div>
+  </div>
+</div>
+
+<!-- پنل اصلی (بعد از ورود نمایش داده میشه) -->
+<div id="panel-view" style="display:none">
+  <section>
+    <div class="admin-header">
+      <div class="section-title">افزودن آهنگ جدید</div>
+      <button class="btn danger" onclick="logout()">خروج</button>
+    </div>
+    <div class="card" style="max-width:520px">
+      <form id="upload-form">
+        <div class="field">
+          <label>عنوان آهنگ</label>
+          <input type="text" id="title" required>
+        </div>
+        <div class="field">
+          <label>نام خواننده</label>
+          <input type="text" id="artist" required>
+        </div>
+        <div class="field">
+          <label>دسته‌بندی</label>
+          <input type="text" id="category" placeholder="مثلاً پاپ، سنتی، رپ">
+        </div>
+        <div class="field">
+          <label>فایل صوتی (mp3, wav, m4a - حداکثر ۳۰ مگابایت)</label>
+          <input type="file" id="audio" accept=".mp3,.wav,.m4a" required>
+        </div>
+        <button class="btn" type="submit" style="width:100%">آپلود</button>
+        <div class="msg" id="upload-msg"></div>
+      </form>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">آهنگ‌های موجود</div>
+    <div class="track-list" id="admin-list"></div>
+  </section>
+</div>
+
+<script>
+  const loginView = document.getElementById('login-view');
+  const panelView = document.getElementById('panel-view');
+
+  async function checkAuth() {
+    const res = await fetch('/api/admin/check');
+    const { isAdmin } = await res.json();
+    if (isAdmin) {
+      loginView.style.display = 'none';
+      panelView.style.display = 'block';
+      loadAdminSongs();
+    } else {
+      loginView.style.display = 'block';
+      panelView.style.display = 'none';
+    }
+  }
+
+  async function login() {
+    const password = document.getElementById('password').value;
+    const msg = document.getElementById('login-msg');
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    if (res.ok) { msg.textContent = ''; checkAuth(); }
+    else { const d = await res.json(); msg.textContent = d.error; }
+  }
+
+  async function logout() {
+    await fetch('/api/admin/logout', { method: 'POST' });
+    checkAuth();
+  }
+
+  document.getElementById('upload-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById('upload-msg');
+    const fd = new FormData();
+    fd.append('title', document.getElementById('title').value);
+    fd.append('artist', document.getElementById('artist').value);
+    fd.append('category', document.getElementById('category').value || 'عمومی');
+    fd.append('audio', document.getElementById('audio').files[0]);
+
+    msg.className = 'msg';
+    msg.textContent = 'در حال آپلود...';
+
+    const res = await fetch('/api/admin/songs', { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (res.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = 'آهنگ با موفقیت اضافه شد';
+      e.target.reset();
+      loadAdminSongs();
+    } else {
+      msg.className = 'msg err';
+      msg.textContent = data.error || 'خطا در آپلود';
+    }
+  });
+
+  async function loadAdminSongs() {
+    const res = await fetch('/api/songs');
+    const songs = await res.json();
+    const list = document.getElementById('admin-list');
+
+    if (!songs.length) {
+      list.innerHTML = '<div class="empty-state">هنوز آهنگی اضافه نشده</div>';
+      return;
+    }
+
+    list.innerHTML = songs.map(s => `
+      <div class="track">
+        <div class="track-num">#${s.id}</div>
+        <div class="track-info">
+          <div class="title">${s.title}</div>
+          <div class="meta">${s.artist} · ${s.category} · ${s.downloads} دانلود</div>
+        </div>
+        <button class="btn danger" onclick="deleteSong(${s.id})">حذف</button>
+      </div>
+    `).join('');
+  }
+
+  async function deleteSong(id) {
+    if (!confirm('مطمئنی می‌خوای این آهنگ رو حذف کنی؟')) return;
+    await fetch(`/api/admin/songs/${id}`, { method: 'DELETE' });
+    loadAdminSongs();
+  }
+
+  checkAuth();
+</script>
+
+</body>
+</html>

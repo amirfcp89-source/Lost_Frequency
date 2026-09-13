@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lost Frequency | دانلود آهنگ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="assets/logo.jpg">
+</head>
+<body>
+
+<header>
+  <div class="logo"><img src="assets/logo.jpg" alt="Lost Frequency"></div>
+  <nav><a href="/admin.html">ورود ادمین</a></nav>
+</header>
+
+<div class="hero">
+  <h1>موسیقی که دنبالشی، همین‌جاست</h1>
+  <p>آهنگ‌های جدید و محبوب رو گوش کن و دانلود کن. تمام آثار با اجازه‌ی هنرمندها منتشر شده.</p>
+</div>
+
+<div class="ad-slot">جایگاه تبلیغ — کد AdSense یا شبکه تبلیغاتی خودتو اینجا قرار بده</div>
+
+<div class="controls">
+  <input class="search-box" id="search" type="text" placeholder="جستجوی آهنگ یا خواننده...">
+  <select class="cat-select" id="category">
+    <option value="همه">همه دسته‌ها</option>
+  </select>
+</div>
+
+<section>
+  <div class="section-title">آهنگ‌ها <span id="count"></span></div>
+  <div class="track-list" id="track-list">
+    <div class="empty-state">در حال بارگذاری...</div>
+  </div>
+</section>
+
+<div class="ad-slot">جایگاه تبلیغ — بنر میان‌محتوا</div>
+
+<footer>ساخته‌شده با ❤️ — Lost Frequency</footer>
+
+<script>
+  const listEl = document.getElementById('track-list');
+  const countEl = document.getElementById('count');
+  const searchEl = document.getElementById('search');
+  const catEl = document.getElementById('category');
+  let debounceTimer;
+
+  async function loadCategories() {
+    const res = await fetch('/api/categories');
+    const cats = await res.json();
+    catEl.innerHTML = '<option value="همه">همه دسته‌ها</option>' +
+      cats.map(c => `<option value="${c}">${c}</option>`).join('');
+  }
+
+  async function loadSongs() {
+    const q = encodeURIComponent(searchEl.value.trim());
+    const category = encodeURIComponent(catEl.value);
+    const res = await fetch(`/api/songs?q=${q}&category=${category}`);
+    const songs = await res.json();
+
+    countEl.textContent = songs.length ? `${songs.length} آهنگ` : '';
+
+    if (!songs.length) {
+      listEl.innerHTML = '<div class="empty-state">چیزی پیدا نشد</div>';
+      return;
+    }
+
+    listEl.innerHTML = songs.map((s, i) => `
+      <div class="track">
+        <div class="track-num">${i + 1}</div>
+        <div class="track-info">
+          <div class="title">${escapeHtml(s.title)}</div>
+          <div class="meta">${escapeHtml(s.artist)} · ${s.downloads} دانلود</div>
+        </div>
+        <span class="track-cat">${escapeHtml(s.category)}</span>
+        <audio controls preload="none" src="/uploads/${encodeURIComponent(s.filename)}"></audio>
+        <button class="dl-btn" onclick="downloadSong(${s.id})">دانلود</button>
+      </div>
+    `).join('');
+  }
+
+  function downloadSong(id) {
+    window.location.href = `/api/download/${id}`;
+    // شمارش دانلود سمت سرور انجام می‌شه، پس بعد از چند ثانیه دوباره لیست رو تازه می‌کنیم
+    setTimeout(loadSongs, 1500);
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  searchEl.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(loadSongs, 300);
+  });
+  catEl.addEventListener('change', loadSongs);
+
+  loadCategories();
+  loadSongs();
+</script>
+
+</body>
+</html>
